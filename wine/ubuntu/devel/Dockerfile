@@ -1,13 +1,9 @@
 # =============================================
 # Ubuntu 24.04 (Noble) + SteamCMD + Wine (devel)
-# IW4x / Proton-compatible yolk
 # =============================================
 FROM ubuntu:24.04
 
-LABEL author="Brainshead" \
-      maintainer="Brainshead <brainshead010@example.com>" \
-      org.opencontainers.image.source="https://github.com/brainshead/yolks" \
-      org.opencontainers.image.title="wine-ubuntu24.04"
+LABEL author="Brainshead"      
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV USER=container
@@ -31,6 +27,38 @@ RUN dpkg --add-architecture i386 && \
     update-locale LANG=en_US.UTF-8 && \
     rm -rf /var/lib/apt/lists/*
 
+RUN             cd /tmp/ \
+                && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz > rcon.tar.gz \
+                && tar xvf rcon.tar.gz \
+                && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/
+				
+# Install wine and with recommends
+RUN             mkdir -pm755 /etc/apt/keyrings
+RUN             wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+RUN             wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources
+RUN             apt update
+RUN             apt install --install-recommends winehq-stable cabextract -y
+
+# Set up Winetricks
+RUN	            wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
+                && chmod +x /usr/sbin/winetricks
+
+# ---------------------------------------------
+# Default environment variables for Pterodactyl
+# ---------------------------------------------
+ENV             HOME=/home/container
+ENV             WINEPREFIX=/home/container/.wine
+ENV             WINEDLLOVERRIDES="mscoree,mshtml="
+ENV             DISPLAY=:0
+ENV             DISPLAY_WIDTH=1024
+ENV             DISPLAY_HEIGHT=768
+ENV             DISPLAY_DEPTH=16
+ENV             AUTO_UPDATE=1
+ENV             XVFB=1
+
+				
+
+
 # ---------------------------------------------
 # Install SteamCMD
 # ---------------------------------------------
@@ -48,12 +76,6 @@ RUN useradd -m -d /home/container container && \
 USER container
 WORKDIR /home/container
 
-# ---------------------------------------------
-# Default environment variables for Pterodactyl
-# ---------------------------------------------
-ENV WINEPREFIX=/home/container/.wine
-ENV WINEDEBUG=-all
-ENV DISPLAY=:0
 
 # ---------------------------------------------
 # Entrypoint

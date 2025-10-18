@@ -3,7 +3,6 @@ name: Build and Publish Wine Yolks
 on:
   push:
     branches:
-      - main
       - brainshead-patch-1
     paths:
       - 'wine/**'
@@ -12,12 +11,15 @@ on:
 
 jobs:
   build:
-    name: Build & Push Wine Yolks
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
       packages: write
+
+    strategy:
+      matrix:
+        yolk-folder: [staging, latest, devel, ubuntu24.04]
 
     steps:
       - name: Checkout repository
@@ -33,24 +35,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Discover Wine yolks
-        id: yolks
-        run: |
-          echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d)
-          echo "Found yolks: $yolk_dirs"
-          # Join folder names as a comma-separated list
-          echo "yolks=$(echo $yolk_dirs | tr ' ' ',')" >> $GITHUB_OUTPUT
-
-      - name: Build and push Wine yolks
+      - name: Build and push Wine yolk
         uses: docker/build-push-action@v6
         with:
+          context: ./wine/${{ matrix.yolk-folder }}
           push: true
           platforms: linux/amd64
-          load: false
-          build-args: |
-            DEBIAN_FRONTEND=noninteractive
-          # Loop over all detected yolks
-          context: ${{ steps.yolks.outputs.yolks }}
-          # Generate dynamic tags based on folder name
-          tags: ${{ steps.yolks.outputs.yolks }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}_devel
+            ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}_latest

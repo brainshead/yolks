@@ -1,7 +1,7 @@
 # ==============================================
-# Ubuntu 24.04 (Noble Numbat) Wine Yolk
+# Ubuntu 24.04 (Noble Numbat) Wine Yolk (Multi-Stage)
 # ==============================================
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS builder
 
 LABEL author="brainshead" maintainer="brainshead"
 LABEL org.opencontainers.image.source="https://github.com/brainshead/yolks"
@@ -10,33 +10,41 @@ LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine (de
 ENV DEBIAN_FRONTEND=noninteractive
 
 # -------------------------------------------------
-# Install dependencies and Wine (devel)
+# Install heavy build dependencies
 # -------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    ca-certificates \
-    curl \
-    wget \
-    git \
-    tar \
-    unzip \
-    xvfb \
-    cabextract \
-    gnupg \
-    libvulkan1 \
-    && dpkg --add-architecture i386 \
+RUN dpkg --add-architecture i386 \
+    && apt-get update -y \
+    && apt-get install -y --no-install-recommends \
+       software-properties-common \
+       ca-certificates \
+       curl \
+       wget \
+       git \
+       tar \
+       unzip \
+       xvfb \
+       cabextract \
+       gnupg \
+       libvulkan1 \
+       python3 \
+       python3-pip \
+       libncurses5:i386 \
+       libncurses6:i386 \
+       libsdl2-2.0-0 \
+       libsdl2-2.0-0:i386 \
+       winbind \
     && mkdir -pm755 /etc/apt/keyrings \
     && curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key \
     && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ noble main" > /etc/apt/sources.list.d/winehq.list \
-    && apt-get update \
-    && apt-get install -y --install-recommends winehq-devel winbind \
+    && apt-get update -y \
+    && apt-get install -y --install-recommends winehq-devel \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
-# RCON CLI
+# Install lightweight tools
 # -------------------------------------------------
-RUN cd /tmp/ \
+RUN cd /tmp \
     && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz -o rcon.tar.gz \
     && tar -xzf rcon.tar.gz \
     && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/rcon \
@@ -44,14 +52,16 @@ RUN cd /tmp/ \
     && rm -rf /tmp/*
 
 # -------------------------------------------------
-# Winetricks
+# Set up Winetricks
 # -------------------------------------------------
 RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
     && chmod +x /usr/local/bin/winetricks
 
 # -------------------------------------------------
-# Default environment variables
+# Final image (lightweight)
 # -------------------------------------------------
+FROM ubuntu:24.04
+
 ENV HOME=/home/container
 ENV WINEPREFIX=/home/container/.wine
 ENV WINEDLLOVERRIDES="mscoree,mshtml="
@@ -62,8 +72,18 @@ ENV DISPLAY_DEPTH=16
 ENV AUTO_UPDATE=1
 ENV XVFB=1
 
+# Copy Wine and tools from builder
+COPY --from=builder /usr/bin/wine /usr/bin/wine
+COPY --from=builder /usr/bin/wine64 /usr/bin/wine64
+COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks
+COPY --from=builder /usr/local/bin/rcon /usr/local/bin/rcon
+COPY --from=builder /usr/lib /usr/lib
+COPY --from=builder /usr/lib32 /usr/lib32
+COPY --from=builder /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
+COPY --from=builder /usr/lib/i386-linux-gnu /usr/lib/i386-linux-gnu
+
 # -------------------------------------------------
-# Setup user
+# User setup
 # -------------------------------------------------
 RUN useradd -m -d /home/container container
 USER container
@@ -72,11 +92,7 @@ WORKDIR /home/container
 # -------------------------------------------------
 # Entrypoint
 # -------------------------------------------------
-# Make sure entrypoint.sh is in the same folder as this Dockerfile
-# Copy entrypoint from repo root
-ARG ENTRYPOINT_PATH
-COPY ${ENTRYPOINT_PATH} /entrypoint.sh
+COPY ./wine/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
 
 ENTRYPOINT ["/entrypoint.sh"]

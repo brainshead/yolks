@@ -8,7 +8,7 @@ on:
     paths:
       - 'wine/**'
       - '.github/workflows/build.yml'
-      - 'entrypoint.sh'
+      - 'wine/entrypoint.sh'
   workflow_dispatch:
 
 jobs:
@@ -41,8 +41,8 @@ jobs:
       - name: Build & push Wine yolk ${{ matrix.yolk-folder }}
         uses: docker/build-push-action@v6
         with:
-          context: .                     # repository root
-          file: ./wine/${{ matrix.yolk-folder }}/Dockerfile
+          context: ./wine                        # Set context to 'wine' folder
+          file: ./${{ matrix.yolk-folder }}/Dockerfile
           push: true
           platforms: linux/amd64
           tags: |

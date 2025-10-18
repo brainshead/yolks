@@ -37,4 +37,4 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/ptero-eggs/yolks:wine_${{ matrix.tag }}
+            ghcr.io/brainshead/yolks:wine_${{ matrix.tag }}

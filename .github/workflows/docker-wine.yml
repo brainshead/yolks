@@ -41,8 +41,8 @@ jobs:
       - name: Build & push Wine yolk ${{ matrix.yolk-folder }}
         uses: docker/build-push-action@v6
         with:
-          context: ./wine                        # Set context to 'wine' folder
-          file: ./${{ matrix.yolk-folder }}/Dockerfile
+          context: ./wine/${{ matrix.yolk-folder }}     # Context is the folder of the yolk
+          file: Dockerfile                             # Dockerfile inside that folder
           push: true
           platforms: linux/amd64
           tags: |

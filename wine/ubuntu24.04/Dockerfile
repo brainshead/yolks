@@ -73,7 +73,10 @@ WORKDIR /home/container
 # Entrypoint
 # -------------------------------------------------
 # Make sure entrypoint.sh is in the same folder as this Dockerfile
-COPY entrypoint.sh /entrypoint.sh
+# Copy entrypoint from repo root
+ARG ENTRYPOINT_PATH
+COPY ${ENTRYPOINT_PATH} /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
 
 ENTRYPOINT ["/entrypoint.sh"]

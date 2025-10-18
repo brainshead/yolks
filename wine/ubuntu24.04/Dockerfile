@@ -1,5 +1,5 @@
 # ==============================================
-# Ubuntu 24.04 (Noble Numbat) Wine Yolk
+# Ubuntu 24.04 (Noble Numbat) Wine Yolk for Pterodactyl
 # ==============================================
 FROM ubuntu:24.04
 
@@ -10,63 +10,72 @@ LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine (de
 ENV DEBIAN_FRONTEND=noninteractive
 
 # -------------------------------------------------
-# Install dependencies and Wine (devel)
+# System setup and Wine (devel) install
 # -------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    ca-certificates \
-    curl \
-    wget \
-    git \
-    tar \
-    unzip \
-    xvfb \
-    cabextract \
-    gnupg \
-    libvulkan1 \
-    && dpkg --add-architecture i386 \
+RUN dpkg --add-architecture i386 \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        software-properties-common \
+        ca-certificates \
+        curl \
+        wget \
+        git \
+        tar \
+        unzip \
+        cabextract \
+        gnupg \
+        libvulkan1 \
+        xvfb \
+        winbind \
+    # Add WineHQ repository and key
     && mkdir -pm755 /etc/apt/keyrings \
     && curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key \
     && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ noble main" > /etc/apt/sources.list.d/winehq.list \
     && apt-get update \
-    && apt-get install -y --install-recommends winehq-devel winbind \
+    && apt-get install -y --install-recommends winehq-devel \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN             cd /tmp/ \
-                && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz > rcon.tar.gz \
-                && tar xvf rcon.tar.gz \
-                && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/
+# -------------------------------------------------
+# Install rcon-cli for remote server control
+# -------------------------------------------------
+RUN cd /tmp \
+    && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz -o rcon.tar.gz \
+    && tar -xzf rcon.tar.gz \
+    && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/rcon \
+    && chmod +x /usr/local/bin/rcon \
+    && rm -rf /tmp/*
 
 # -------------------------------------------------
-# Default environment variables
+# Install Winetricks (latest)
 # -------------------------------------------------
-# Set up Winetricks
-RUN	            wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
-                && chmod +x /usr/sbin/winetricks
-
-ENV             HOME=/home/container
-ENV             WINEPREFIX=/home/container/.wine
-ENV             WINEDLLOVERRIDES="mscoree,mshtml="
-ENV             DISPLAY=:0
-ENV             DISPLAY_WIDTH=1024
-ENV             DISPLAY_HEIGHT=768
-ENV             DISPLAY_DEPTH=16
-ENV             AUTO_UPDATE=1
-ENV             XVFB=1
+RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
+    && chmod +x /usr/local/bin/winetricks
 
 # -------------------------------------------------
-# Setup user
+# Environment configuration
+# -------------------------------------------------
+ENV HOME=/home/container
+ENV WINEPREFIX=/home/container/.wine
+ENV WINEDLLOVERRIDES="mscoree,mshtml="
+ENV DISPLAY=:0
+ENV DISPLAY_WIDTH=1024
+ENV DISPLAY_HEIGHT=768
+ENV DISPLAY_DEPTH=16
+ENV AUTO_UPDATE=1
+ENV XVFB=1
+
+# -------------------------------------------------
+# Create container user
 # -------------------------------------------------
 RUN useradd -m -d /home/container container
 USER container
 WORKDIR /home/container
 
 # -------------------------------------------------
-# Entrypoint
+# Entrypoint setup
 # -------------------------------------------------
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-

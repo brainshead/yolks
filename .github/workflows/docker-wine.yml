@@ -38,13 +38,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine Dockerfile path
+        id: dockerfile
+        run: |
+          DOCKERFILE_PATH=$(find ./wine/${{ matrix.yolk-folder }} -maxdepth 1 -type f -iname 'Dockerfile*' | head -n 1)
+          if [ -z "$DOCKERFILE_PATH" ]; then
+            echo "No Dockerfile found in ./wine/${{ matrix.yolk-folder }}"
+            exit 1
+          fi
+          echo "Dockerfile found: $DOCKERFILE_PATH"
+          echo "dockerfile=$DOCKERFILE_PATH" >> $GITHUB_OUTPUT
+
       - name: Build & push Wine yolk ${{ matrix.yolk-folder }}
         uses: docker/build-push-action@v6
         with:
-          context: ./wine/${{ matrix.yolk-folder }}   # context is the yolk folder
-          file: Dockerfile                           # Dockerfile is inside the context
+          context: ./wine/${{ matrix.yolk-folder }}
+          file: ${{ steps.dockerfile.outputs.dockerfile }}
           push: true
           platforms: linux/amd64
           tags: |
             ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}_devel
             ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}_latest
+          build-args: |
+            ENTRYPOINT_PATH=../../entrypoint.sh

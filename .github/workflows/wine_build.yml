@@ -1,0 +1,56 @@
+name: Build and Publish Wine Yolks
+
+on:
+  push:
+    branches:
+      - main
+      - brainshead-patch-1
+    paths:
+      - 'wine/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Push Wine Yolks
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Discover Wine yolks
+        id: yolks
+        run: |
+          echo "Finding all wine yolk folders..."
+          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d)
+          echo "Found yolks: $yolk_dirs"
+          # Join folder names as a comma-separated list
+          echo "yolks=$(echo $yolk_dirs | tr ' ' ',')" >> $GITHUB_OUTPUT
+
+      - name: Build and push Wine yolks
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          platforms: linux/amd64
+          load: false
+          build-args: |
+            DEBIAN_FRONTEND=noninteractive
+          # Loop over all detected yolks
+          context: ${{ steps.yolks.outputs.yolks }}
+          # Generate dynamic tags based on folder name
+          tags: ${{ steps.yolks.outputs.yolks }}

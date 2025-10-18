@@ -3,14 +3,17 @@ name: Build and Publish Wine Yolks
 on:
   push:
     branches:
+      - main
       - brainshead-patch-1
     paths:
       - 'wine/**'
       - '.github/workflows/build.yml'
+      - 'entrypoint.sh'
   workflow_dispatch:
 
 jobs:
   build:
+    name: Build & Push Wine Yolks
     runs-on: ubuntu-latest
 
     permissions:
@@ -35,10 +38,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Wine yolk
+      - name: Build & push Wine yolk ${{ matrix.yolk-folder }}
         uses: docker/build-push-action@v6
         with:
-          context: ./wine/${{ matrix.yolk-folder }}
+          context: .                     # repository root
+          file: ./wine/${{ matrix.yolk-folder }}/Dockerfile
           push: true
           platforms: linux/amd64
           tags: |

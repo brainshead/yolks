@@ -8,7 +8,6 @@ on:
     paths:
       - 'wine/**'
       - '.github/workflows/build.yml'
-      - 'entrypoint.sh'
   workflow_dispatch:
 
 jobs:
@@ -20,26 +19,13 @@ jobs:
       contents: read
       packages: write
 
-    strategy:
-      matrix:
-        yolk-folder: [staging, latest, devel, ubuntu24.04]
-
     steps:
-      # -------------------------------
-      # Checkout the repository
-      # -------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -------------------------------
-      # Set up Docker Buildx
-      # -------------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # -------------------------------
-      # Login to GitHub Container Registry
-      # -------------------------------
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -47,16 +33,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # -------------------------------
-      # Build & push Wine yolks
-      # -------------------------------
-      - name: Build & push Wine yolk ${{ matrix.yolk-folder }}
-        uses: docker/build-push-action@v6
-        with:
-          context: ./wine/${{ matrix.yolk-folder }}  # Set context to the specific yolk folder
-          file: ./wine/${{ matrix.yolk-folder }}/Dockerfile
-          push: true
-          platforms: linux/amd64
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}_devel
-            ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}_latest
+      - name: Discover Wine yolk folders
+        id: yolks
+        run: |
+          echo "Finding all wine yolk folders..."
+          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+          echo "Found yolks: $yolk_dirs"
+          echo "yolks<<EOF" >> $GITHUB_OUTPUT
+          echo "$yolk_dirs" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build and push each Wine yolk
+        run: |
+          for dir in ${{ steps.yolks.outputs.yolks }}; do
+            echo "====================================="
+            echo " Building and pushing yolk: $dir"
+            echo "====================================="
+
+            docker buildx build \
+              --file "./wine/$dir/Dockerfile" \
+              --build-arg DEBIAN_FRONTEND=noninteractive \
+              --platform linux/amd64 \
+              --tag "ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}" \
+              --tag "ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_devel" \
+              --tag "ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_latest" \
+              --push \
+              .
+
+          done

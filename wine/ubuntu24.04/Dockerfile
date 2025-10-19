@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine (de
 ENV DEBIAN_FRONTEND=noninteractive
 
 # -------------------------------------------------
-# Install heavy build dependencies
+# Install build dependencies
 # -------------------------------------------------
 RUN dpkg --add-architecture i386 \
     && apt-get update -y \
@@ -33,11 +33,14 @@ RUN dpkg --add-architecture i386 \
        libsdl2-2.0-0 \
        libsdl2-2.0-0:i386 \
        winbind \
-    && mkdir -pm755 /etc/apt/keyrings \
-    && curl -fsSL https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor -o /etc/apt/keyrings/winehq-archive.key \
-    && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ noble main" > /etc/apt/sources.list.d/winehq.list \
-    && apt-get update -y \
-    && apt-get install -y --install-recommends winehq-devel \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# -------------------------------------------------
+# Install Wine (Ubuntu repo temporarily)
+# -------------------------------------------------
+RUN apt-get update -y \
+    && apt-get install -y wine \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -58,7 +61,7 @@ RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winet
     && chmod +x /usr/local/bin/winetricks
 
 # -------------------------------------------------
-# Final image (lightweight)
+# Final lightweight image
 # -------------------------------------------------
 FROM ubuntu:24.04
 
@@ -92,7 +95,8 @@ WORKDIR /home/container
 # -------------------------------------------------
 # Entrypoint
 # -------------------------------------------------
-COPY ../entrypoint.sh /entrypoint.sh
+COPY ./../entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+CMD  [ "/bin/bash", "/entrypoint.sh" ]
 
-ENTRYPOINT ["/entrypoint.sh"]
+

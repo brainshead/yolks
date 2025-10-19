@@ -1,17 +1,15 @@
 # ==============================================
-# Ubuntu 24.04 (Noble Numbat) Wine Yolk (Multi-Stage)
+# Ubuntu 24.04 (Noble Numbat) Wine Yolk
 # ==============================================
 FROM ubuntu:24.04 AS builder
 
 LABEL author="brainshead" maintainer="brainshead"
 LABEL org.opencontainers.image.source="https://github.com/brainshead/yolks"
-LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine (devel) for Pterodactyl"
+LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine for Pterodactyl"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# -------------------------------------------------
 # Install build dependencies
-# -------------------------------------------------
 RUN dpkg --add-architecture i386 \
     && apt-get update -y \
     && apt-get install -y --no-install-recommends \
@@ -28,25 +26,17 @@ RUN dpkg --add-architecture i386 \
        libvulkan1 \
        python3 \
        python3-pip \
-       libncurses5:i386 \
-       libncurses6:i386 \
-       libsdl2-2.0-0 \
-       libsdl2-2.0-0:i386 \
        winbind \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# -------------------------------------------------
-# Install Wine from Ubuntu repository (temporary)
-# -------------------------------------------------
+# Install Wine (Ubuntu repo temporarily)
 RUN apt-get update -y \
-    && apt-get install -y --install-recommends wine \
+    && apt-get install -y wine \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# -------------------------------------------------
 # Install lightweight tools
-# -------------------------------------------------
 RUN cd /tmp \
     && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz -o rcon.tar.gz \
     && tar -xzf rcon.tar.gz \
@@ -54,15 +44,13 @@ RUN cd /tmp \
     && chmod +x /usr/local/bin/rcon \
     && rm -rf /tmp/*
 
-# -------------------------------------------------
 # Set up Winetricks
-# -------------------------------------------------
 RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
     && chmod +x /usr/local/bin/winetricks
 
-# -------------------------------------------------
+# -------------------
 # Final lightweight image
-# -------------------------------------------------
+# -------------------
 FROM ubuntu:24.04
 
 ENV HOME=/home/container
@@ -77,24 +65,16 @@ ENV XVFB=1
 
 # Copy Wine and tools from builder
 COPY --from=builder /usr/bin/wine /usr/bin/wine
-COPY --from=builder /usr/bin/wine64 /usr/bin/wine64
 COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks
 COPY --from=builder /usr/local/bin/rcon /usr/local/bin/rcon
 COPY --from=builder /usr/lib /usr/lib
-COPY --from=builder /usr/lib32 /usr/lib32
-COPY --from=builder /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
-COPY --from=builder /usr/lib/i386-linux-gnu /usr/lib/i386-linux-gnu
 
-# -------------------------------------------------
 # User setup
-# -------------------------------------------------
 RUN useradd -m -d /home/container container
 USER container
 WORKDIR /home/container
 
-# -------------------------------------------------
-# Entrypoint (from wine root)
-# -------------------------------------------------
-COPY ../entrypoint.sh /entrypoint.sh
+# Entrypoint (single file in wine root)
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

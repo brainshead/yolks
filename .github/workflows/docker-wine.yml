@@ -24,22 +24,17 @@ jobs:
         id: set_matrix
         run: |
           echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | paste -sd "," -)
-          echo "Found yolks: $yolk_dirs"
-          echo "yolk_matrix=$yolk_dirs" >> $GITHUB_OUTPUT
+          yolks=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f," | grep -v '^$' | sed 's/,$//')
+          echo "Found yolks: $yolks"
+          echo "yolk_matrix=$yolks" >> $GITHUB_OUTPUT
 
   build_each:
-    name: Build & Push Wine Yolk ${{ matrix.yolk }}
+    name: Build & Push each Wine yolk
     needs: discover_yolks
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        yolk: ${{ fromJSON('["'  }}${{ replace(needs.discover_yolks.outputs.yolk_matrix, ',', '","') }}${{ '"]') }}
-
-    permissions:
-      contents: read
-      packages: write
-
+        yolk: ${{ fromJSON('["' + replace(needs.discover_yolks.outputs.yolk_matrix, ',', '","') + '"]') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,12 +49,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.yolk }}
-        run: |
-          echo "Building yolk: ${{ matrix.yolk }}"
-          docker buildx build \
-            --file ./wine/${{ matrix.yolk }}/Dockerfile \
-            --platform linux/amd64 \
-            --push \
-            -t ghcr.io/${{ github.repository_owner }}/yolks:${{ matrix.yolk }} \
-            ./wine/${{ matrix.yolk }}
+      - name: Build & Push ${{ matrix.yolk }} yolk
+        uses: docker/build-push-action@v6
+        with:
+          context: .  # repo root
+          file: ./wine/${{ matrix.yolk }}/Dockerfile
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            DEBIAN_FRONTEND=noninteractive
+            ENTRYPOINT_PATH=./wine/entrypoint.sh
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/yolks:${{ matrix.yolk }}

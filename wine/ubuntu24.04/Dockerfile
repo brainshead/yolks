@@ -38,7 +38,6 @@ RUN dpkg --add-architecture i386 \
        lib32z1 \
        lib32ncurses6 \
        lib32stdc++6 \
-       wine32 \
     && locale-gen en_US.UTF-8 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -50,6 +49,13 @@ RUN cd /tmp \
     && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/rcon \
     && chmod +x /usr/local/bin/rcon \
     && rm -rf /tmp/*
+	
+# Install wine and with recommends
+RUN             mkdir -pm755 /etc/apt/keyrings
+RUN             wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+RUN             wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources
+RUN             apt update
+RUN             apt install --install-recommends winehq-stable cabextract -y
 
 # Install Winetricks
 RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
@@ -70,13 +76,6 @@ ENV DISPLAY_HEIGHT=768
 ENV DISPLAY_DEPTH=16
 ENV AUTO_UPDATE=1
 ENV XVFB=1
-
-# Copy Wine and tools from builder
-COPY --from=builder /usr/bin/wine /usr/bin/wine
-COPY --from=builder /usr/bin/steamcmd /usr/bin/steamcmd
-COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks
-COPY --from=builder /usr/local/bin/rcon /usr/local/bin/rcon
-COPY --from=builder /usr/lib /usr/lib
 
 # Create container user
 RUN useradd -m -d /home/container container

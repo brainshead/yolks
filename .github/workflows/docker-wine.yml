@@ -37,18 +37,28 @@ jobs:
         id: yolks
         run: |
           echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf '%f ')
           echo "Found yolks: $yolk_dirs"
-          echo "yolks<<EOF" >> $GITHUB_OUTPUT
-          echo "$yolk_dirs" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "yolks=$yolk_dirs" >> $GITHUB_OUTPUT
 
       - name: Build and push each Wine yolk
         run: |
+          echo "====================================="
+          echo "  Building and pushing Wine yolks..."
+          echo "====================================="
+          summary_file="build_summary.txt"
+          echo "| Yolk Folder | GHCR Tags |" > $summary_file
+          echo "|--------------|------------|" >> $summary_file
+
           for dir in ${{ steps.yolks.outputs.yolks }}; do
-            echo "====================================="
-            echo " Building and pushing yolk: $dir"
-            echo "====================================="
+            if [ ! -f "./wine/$dir/Dockerfile" ]; then
+              echo "⚠️ Skipping '$dir' — no Dockerfile found."
+              continue
+            fi
+
+            echo ""
+            echo "🧩 Building yolk: $dir"
+            echo "-------------------------------------"
 
             docker buildx build \
               --file "./wine/$dir/Dockerfile" \
@@ -60,4 +70,13 @@ jobs:
               --push \
               .
 
+            echo "| $dir | ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}\n\
+ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_devel\n\
+ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_latest |" >> $summary_file
           done
+
+          echo ""
+          echo "✅ All Wine yolks built and pushed (or skipped if missing Dockerfile)."
+          echo ""
+          echo "📦 Build Summary:"
+          cat $summary_file >> $GITHUB_STEP_SUMMARY

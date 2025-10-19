@@ -27,6 +27,14 @@ RUN dpkg --add-architecture i386 \
        python3 \
        python3-pip \
        winbind \
+	   iproute2 \
+       numactl \
+	   curl \
+       libc6:i386 \
+       libncurses5:i386 \
+       libncurses6:i386 \
+       libsdl2-2.0-0 \
+       libsdl2-2.0-0:i386 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -73,6 +81,9 @@ COPY --from=builder /usr/lib /usr/lib
 RUN useradd -m -d /home/container container
 USER container
 WORKDIR /home/container
+
+# Initialize wine prefix on first run
+RUN wineboot --init || true
 
 # Entrypoint (single file in wine root)
 COPY            ./../entrypoint.sh /entrypoint.sh

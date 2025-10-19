@@ -7,7 +7,7 @@ on:
       - brainshead-patch-1
     paths:
       - 'wine/**'
-      - '.github/workflows/build.yml'
+      - '.github/workflows/docker-wine.yml'
   workflow_dispatch:
 
 jobs:

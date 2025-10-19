@@ -24,10 +24,9 @@ jobs:
         id: set_matrix
         run: |
           echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | tr '\n' ',')
-          yolk_dirs=${yolk_dirs%,}  # remove trailing comma
+          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | paste -sd "," -)
           echo "Found yolks: $yolk_dirs"
-          echo "::set-output name=yolk_matrix::${yolk_dirs}"
+          echo "::set-output name=yolk_matrix::$yolk_dirs"
 
   build_each:
     name: Build & Push Wine Yolk ${{ matrix.yolk }}
@@ -35,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        yolk: ${{ fromJson('["' + needs.discover_yolks.outputs.yolk_matrix | replace(',', '","') + '"]') }}
+        yolk: ${{ fromJSON('["' + replace(needs.discover_yolks.outputs.yolk_matrix, ',', '","') + '"]') }}
 
     permissions:
       contents: read

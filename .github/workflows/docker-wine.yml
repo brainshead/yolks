@@ -11,12 +11,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  discover_yolks:
+    name: Discover Wine Yolks
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      yolk_list: ${{ steps.set_outputs.outputs.yolk_list }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Set Wine yolks output
+        id: set_outputs
+        run: |
+          yolks=$(find ./wine -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+          echo "Found yolks: $yolks"
+          # Convert space-separated list to comma-separated
+          yolks_csv=$(echo $yolks | tr ' ' ',')
+          echo "yolk_list=$yolks_csv" >> $GITHUB_OUTPUT
+
+  build_each:
+    name: Build & Push Wine Yolks
+    runs-on: ubuntu-latest
+    needs: discover_yolks
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,17 +47,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Discover Wine yolks
-        id: discover_yolks
+      - name: Build and push each Wine yolk
         run: |
-          yolks=$(find ./wine -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
-          echo "Found yolks: $yolks"
-          echo "yolk_list=$yolks" >> $GITHUB_OUTPUT
-
-      - name: Build & Push Wine Yolks
-        run: |
-          for yolk in ${{ steps.discover_yolks.outputs.yolk_list }}; do
-            echo "Building $yolk..."
+          IFS=',' read -r -a yolk_array <<< "${{ needs.discover_yolks.outputs.yolk_list }}"
+          for yolk in "${yolk_array[@]}"; do
+            echo "======================================"
+            echo "Building yolk: $yolk"
+            echo "======================================"
             docker buildx build \
               --platform linux/amd64 \
               --push \

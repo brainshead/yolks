@@ -33,50 +33,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Discover Wine yolk folders
+      - name: Discover Wine yolks
         id: yolks
         run: |
           echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf '%f ')
+          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f\n")
           echo "Found yolks: $yolk_dirs"
-          echo "yolks=$yolk_dirs" >> $GITHUB_OUTPUT
+          # Export to matrix format (JSON array)
+          echo "matrix=$(jq -nc --argjson arr "$(printf '%s\n' $yolk_dirs | jq -R . | jq -s .)" '$arr')" >> $GITHUB_OUTPUT
 
-      - name: Build and push each Wine yolk
-        run: |
-          echo "====================================="
-          echo "  Building and pushing Wine yolks..."
-          echo "====================================="
-          summary_file="build_summary.txt"
-          echo "| Yolk Folder | GHCR Tags |" > $summary_file
-          echo "|--------------|------------|" >> $summary_file
+  build_each:
+    name: Build & Push ${{ matrix.yolk }}
+    runs-on: ubuntu-latest
+    needs: build
 
-          for dir in ${{ steps.yolks.outputs.yolks }}; do
-            if [ ! -f "./wine/$dir/Dockerfile" ]; then
-              echo "⚠️ Skipping '$dir' — no Dockerfile found."
-              continue
-            fi
+    strategy:
+      matrix:
+        yolk: ${{ fromJson(needs.build.outputs.matrix) }}
 
-            echo ""
-            echo "🧩 Building yolk: $dir"
-            echo "-------------------------------------"
+    permissions:
+      contents: read
+      packages: write
 
-            docker buildx build \
-              --file "./wine/$dir/Dockerfile" \
-              --build-arg DEBIAN_FRONTEND=noninteractive \
-              --platform linux/amd64 \
-              --tag "ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}" \
-              --tag "ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_devel" \
-              --tag "ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_latest" \
-              --push \
-              .
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            echo "| $dir | ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}\n\
-ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_devel\n\
-ghcr.io/${{ github.repository_owner }}/yolks:wine_${dir}_latest |" >> $summary_file
-          done
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          echo ""
-          echo "✅ All Wine yolks built and pushed (or skipped if missing Dockerfile)."
-          echo ""
-          echo "📦 Build Summary:"
-          cat $summary_file >> $GITHUB_STEP_SUMMARY
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.yolk }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./wine/${{ matrix.yolk }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk }}_latest
+            ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk }}_devel
+          build-args: |
+            DEBIAN_FRONTEND=noninteractive

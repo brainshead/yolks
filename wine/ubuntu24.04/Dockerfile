@@ -75,6 +75,6 @@ USER container
 WORKDIR /home/container
 
 # Entrypoint (single file in wine root)
-COPY entrypoint.sh /entrypoint.sh
+COPY            ./../entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+CMD             [ "/bin/bash", "/entrypoint.sh" ]

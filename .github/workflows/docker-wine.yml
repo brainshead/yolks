@@ -11,32 +11,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  discover_yolks:
-    name: Discover Wine yolks
+  build:
+    name: Build & Push Wine Yolks
     runs-on: ubuntu-latest
-    outputs:
-      yolk_matrix: ${{ steps.set_matrix.outputs.yolk_matrix }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Find wine yolk folders
-        id: set_matrix
-        run: |
-          echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
-          echo "Found yolks: $yolk_dirs"
-          # Convert space-separated list to comma-separated
-          yolk_matrix=$(echo $yolk_dirs | tr ' ' ',')
-          echo "yolk_matrix=$yolk_matrix" >> $GITHUB_OUTPUT
+    permissions:
+      contents: read
+      packages: write
 
-  build_each:
-    name: Build & Push each Wine yolk
-    needs: discover_yolks
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        yolk: ${{ fromJSON('["' || replace(needs.discover_yolks.outputs.yolk_matrix, ',', '","') || '"]') }}
+        yolk-folder: [staging, latest, devel, ubuntu24.04]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,11 +37,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push ${{ matrix.yolk }}
+      - name: Build & push ${{ matrix.yolk-folder }} yolk
         uses: docker/build-push-action@v6
         with:
-          context: ./wine/${{ matrix.yolk }}
-          file: ./wine/${{ matrix.yolk }}/Dockerfile
+          context: ./wine                     # <-- context includes entrypoint.sh
+          file: ./wine/${{ matrix.yolk-folder }}/Dockerfile
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk }}
+          tags: ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}

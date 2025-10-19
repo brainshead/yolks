@@ -1,15 +1,15 @@
 # ==============================================
-# Ubuntu 24.04 (Noble Numbat) Wine Yolk
+# Ubuntu 24.04 (Noble Numbat) Wine Yolk for SteamCMD
 # ==============================================
 FROM ubuntu:24.04 AS builder
 
-LABEL author="brainshead" maintainer="brainshead"
+LABEL author="brainshead"
 LABEL org.opencontainers.image.source="https://github.com/brainshead/yolks"
-LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine for Pterodactyl"
+LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine (32-bit) for Pterodactyl"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install build dependencies
+# Install build dependencies + 32-bit libs
 RUN dpkg --add-architecture i386 \
     && apt-get update -y \
     && apt-get install -y --no-install-recommends \
@@ -27,20 +27,21 @@ RUN dpkg --add-architecture i386 \
        python3 \
        python3-pip \
        winbind \
-	   iproute2 \
+       iproute2 \
        numactl \
-	   curl \
        libc6:i386 \
        libncurses5:i386 \
        libncurses6:i386 \
        libsdl2-2.0-0 \
        libsdl2-2.0-0:i386 \
+       libstdc++6:i386 \
+       zlib1g:i386 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Wine (Ubuntu repo temporarily)
 RUN apt-get update -y \
-    && apt-get install -y wine \
+    && apt-get install -y wine32 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -63,6 +64,7 @@ FROM ubuntu:24.04
 
 ENV HOME=/home/container
 ENV WINEPREFIX=/home/container/.wine
+ENV WINEARCH=win32
 ENV WINEDLLOVERRIDES="mscoree,mshtml="
 ENV DISPLAY=:0
 ENV DISPLAY_WIDTH=1024
@@ -72,19 +74,16 @@ ENV AUTO_UPDATE=1
 ENV XVFB=1
 
 # Copy Wine and tools from builder
-COPY --from=builder /usr/bin/wine /usr/bin/wine
-COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks
-COPY --from=builder /usr/local/bin/rcon /usr/local/bin/rcon
-COPY --from=builder /usr/lib /usr/lib
+#COPY --from=builder /usr/bin/wine /usr/bin/wine
+#COPY --from=builder /usr/local/bin/winetricks /usr/local/bin/winetricks
+#COPY --from=builder /usr/local/bin/rcon /usr/local/bin/rcon
+#COPY --from=builder /usr/lib /usr/lib
 
 # User setup
 RUN useradd -m -d /home/container container
 USER container
 WORKDIR /home/container
 
-# Initialize wine prefix on first run
-RUN wineboot --init || true
-
-# Entrypoint (single file in wine root)
-COPY            ./../entrypoint.sh /entrypoint.sh
+# Entrypoint (single file in wine folder)
+COPY ./../entrypoint.sh /entrypoint.sh
 CMD             [ "/bin/bash", "/entrypoint.sh" ]

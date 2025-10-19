@@ -9,7 +9,9 @@ LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine (de
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# -------------------------------------------------
 # Install build dependencies
+# -------------------------------------------------
 RUN dpkg --add-architecture i386 \
     && apt-get update -y \
     && apt-get install -y --no-install-recommends \
@@ -26,17 +28,25 @@ RUN dpkg --add-architecture i386 \
        libvulkan1 \
        python3 \
        python3-pip \
+       libncurses5:i386 \
+       libncurses6:i386 \
+       libsdl2-2.0-0 \
+       libsdl2-2.0-0:i386 \
        winbind \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Wine (Ubuntu repo temporarily)
+# -------------------------------------------------
+# Install Wine from Ubuntu repository (temporary)
+# -------------------------------------------------
 RUN apt-get update -y \
-    && apt-get install -y wine \
+    && apt-get install -y --install-recommends wine \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# -------------------------------------------------
 # Install lightweight tools
+# -------------------------------------------------
 RUN cd /tmp \
     && curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz -o rcon.tar.gz \
     && tar -xzf rcon.tar.gz \
@@ -44,13 +54,15 @@ RUN cd /tmp \
     && chmod +x /usr/local/bin/rcon \
     && rm -rf /tmp/*
 
+# -------------------------------------------------
 # Set up Winetricks
+# -------------------------------------------------
 RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks \
     && chmod +x /usr/local/bin/winetricks
 
-# -------------------
+# -------------------------------------------------
 # Final lightweight image
-# -------------------
+# -------------------------------------------------
 FROM ubuntu:24.04
 
 ENV HOME=/home/container
@@ -73,12 +85,16 @@ COPY --from=builder /usr/lib32 /usr/lib32
 COPY --from=builder /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu
 COPY --from=builder /usr/lib/i386-linux-gnu /usr/lib/i386-linux-gnu
 
+# -------------------------------------------------
 # User setup
+# -------------------------------------------------
 RUN useradd -m -d /home/container container
 USER container
 WORKDIR /home/container
 
-# Entrypoint
-COPY ./entrypoint.sh /entrypoint.sh
+# -------------------------------------------------
+# Entrypoint (from wine root)
+# -------------------------------------------------
+COPY ../entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

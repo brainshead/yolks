@@ -11,17 +11,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build & Push Wine Yolks
+  build_yolks:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
-
-    strategy:
-      matrix:
-        yolk-folder: [staging, latest, devel, ubuntu24.04]
 
     steps:
       - name: Checkout repository
@@ -37,11 +31,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push ${{ matrix.yolk-folder }} yolk
-        uses: docker/build-push-action@v6
-        with:
-          context: ./wine                     # <-- context includes entrypoint.sh
-          file: ./wine/${{ matrix.yolk-folder }}/Dockerfile
-          push: true
-          platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk-folder }}
+      - name: Discover Wine yolks
+        id: discover_yolks
+        run: |
+          yolks=$(find ./wine -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+          echo "yolks=$yolks" >> $GITHUB_OUTPUT
+
+      - name: Build & push Wine yolks
+        run: |
+          for yolk in ${{ steps.discover_yolks.outputs.yolks }}; do
+            echo "Building $yolk..."
+            docker buildx build \
+              --file wine/$yolk/Dockerfile \
+              --platform linux/amd64 \
+              --push \
+              --tag ghcr.io/${{ github.repository_owner }}/yolks:wine_$yolk \
+              wine/$yolk
+          done

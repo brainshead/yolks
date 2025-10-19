@@ -9,6 +9,7 @@ LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine, St
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+
 # Add 32-bit architecture and install required packages
 RUN dpkg --add-architecture i386 \
     && apt-get update -y \
@@ -38,7 +39,6 @@ RUN dpkg --add-architecture i386 \
        lib32ncurses6 \
        lib32stdc++6 \
        wine32 \
-       steamcmd \
     && locale-gen en_US.UTF-8 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

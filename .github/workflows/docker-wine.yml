@@ -11,45 +11,35 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build & Push Wine Yolks
+  discover:
+    name: Discover Wine Yolks
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      matrix: ${{ steps.yolks.outputs.matrix }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Discover Wine yolks
+      - name: Find Wine yolk folders
         id: yolks
         run: |
           echo "Finding all wine yolk folders..."
-          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f\n")
-          echo "Found yolks: $yolk_dirs"
-          # Export to matrix format (JSON array)
-          echo "matrix=$(jq -nc --argjson arr "$(printf '%s\n' $yolk_dirs | jq -R . | jq -s .)" '$arr')" >> $GITHUB_OUTPUT
+          yolk_dirs=$(find ./wine -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort)
+          echo "Found yolks:"
+          echo "$yolk_dirs"
+          json_array=$(printf '%s\n' $yolk_dirs | jq -R . | jq -s .)
+          echo "matrix=$json_array" >> $GITHUB_OUTPUT
 
   build_each:
     name: Build & Push ${{ matrix.yolk }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: discover
 
     strategy:
       matrix:
-        yolk: ${{ fromJson(needs.build.outputs.matrix) }}
+        yolk: ${{ fromJson(needs.discover.outputs.matrix) }}
 
     permissions:
       contents: read
@@ -70,9 +60,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.yolk }}
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ./wine/${{ matrix.yolk }}
+          file: ./wine/${{ matrix.yolk }}/Dockerfile
           push: true
           platforms: linux/amd64
           tags: |
@@ -80,3 +72,11 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk }}_devel
           build-args: |
             DEBIAN_FRONTEND=noninteractive
+
+      - name: Build Summary
+        run: |
+          echo "--------------------------------------------"
+          echo "Successfully built and pushed the following images for ${{ matrix.yolk }}:"
+          echo " - ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk }}_latest"
+          echo " - ghcr.io/${{ github.repository_owner }}/yolks:wine_${{ matrix.yolk }}_devel"
+          echo "--------------------------------------------"

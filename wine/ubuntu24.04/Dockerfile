@@ -5,14 +5,14 @@ FROM ubuntu:24.04 AS builder
 
 LABEL author="brainshead"
 LABEL org.opencontainers.image.source="https://github.com/brainshead/yolks"
-LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine, Winetricks & SteamCMD support (GLIBC 2.39)"
+LABEL org.opencontainers.image.description="Ubuntu 24.04 base yolk with Wine, Winetricks & SteamCMD compatibility (GLIBC 2.39 + 2.35 compat)"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
 # -----------------------
-# Base Dependencies
+# Core Dependencies
 # -----------------------
 RUN dpkg --add-architecture i386 && \
     apt-get update -y && \
@@ -43,7 +43,7 @@ RUN wget -q -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winet
     chmod +x /usr/local/bin/winetricks
 
 # -----------------------
-# RCON Client (optional)
+# RCON CLI (optional tool)
 # -----------------------
 RUN cd /tmp && \
     curl -sSL https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz -o rcon.tar.gz && \
@@ -51,16 +51,18 @@ RUN cd /tmp && \
     chmod +x /usr/local/bin/rcon && rm -rf /tmp/*
 
 # -----------------------
-# SteamCMD Compatibility Layer (Ubuntu 22.04)
+# SteamCMD Compatibility Environment (Ubuntu 22.04 / GLIBC 2.35)
 # -----------------------
 RUN mkdir -p /opt/steamcmd-compat && \
     debootstrap --arch=amd64 jammy /opt/steamcmd-compat http://archive.ubuntu.com/ubuntu && \
     chroot /opt/steamcmd-compat apt-get update && \
     chroot /opt/steamcmd-compat apt-get install -y lib32gcc-s1 libstdc++6 zlib1g && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /opt/steamcmd-compat/var/lib/apt/lists/*
 
-# Wrapper so eggs can run SteamCMD in the compat layer
-RUN echo '#!/bin/bash\nchroot /opt/steamcmd-compat /bin/bash -c "/mnt/server/steamcmd/steamcmd.sh $@"' \
+# -----------------------
+# Unprivileged SteamCMD Wrapper
+# -----------------------
+RUN printf '#!/bin/bash\nset -e\n/usr/sbin/chroot --userspec=$(id -u):$(id -g) /opt/steamcmd-compat /bin/bash -c "/mnt/server/steamcmd/steamcmd.sh $*"\n' \
     > /usr/local/bin/steamcmd-wrapper && chmod +x /usr/local/bin/steamcmd-wrapper
 
 # -------------------
@@ -81,18 +83,18 @@ ENV XVFB=1
 ENV STEAMCMD_DIR=/home/container/steamcmd
 ENV PATH=$PATH:/home/container/steamcmd
 
-# Copy tools from builder
+# Copy all runtime assets
 COPY --from=builder /usr /usr
 COPY --from=builder /etc/apt/keyrings /etc/apt/keyrings
 COPY --from=builder /opt/steamcmd-compat /opt/steamcmd-compat
 COPY --from=builder /usr/local/bin/steamcmd-wrapper /usr/local/bin/steamcmd-wrapper
 
-# Create user
+# Create runtime user
 RUN useradd -m -d /home/container container
 USER container
 WORKDIR /home/container
 
-# Initialize wine prefix
+# Initialize Wine prefix
 RUN wineboot --init || true
 
 COPY ./../entrypoint.sh /entrypoint.sh
